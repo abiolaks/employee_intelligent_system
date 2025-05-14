@@ -1,9 +1,14 @@
-import openai
+from openai import OpenAI
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")  # Update this
+
+# Initialize DeepSeek client
+client = OpenAI(
+    api_key=os.getenv("DEEPSEEK_API_KEY"),
+    base_url="https://api.deepseek.com/v1",
+)
 
 
 def generate_insights(employee_row):
@@ -23,14 +28,17 @@ Prescriptive: ...
 Preventive: ...
 """
 
-    response = openai.chat.completions.create(
-        model="gpt-4", messages=[{"role": "user", "content": prompt}], temperature=0.7
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
     )
 
     text = response.choices[0].message.content
     output = {"diagnostic": "", "prescriptive": "", "preventive": ""}
 
     for line in text.split("\n"):
+        line = line.strip()
         if line.lower().startswith("diagnostic:"):
             output["diagnostic"] = line.split(":", 1)[1].strip()
         elif line.lower().startswith("prescriptive:"):
