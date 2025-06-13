@@ -8,3 +8,6 @@ joblib
 matplotlib
 dotenv
 statsmodels
+azure-storage-blob
+pyopenssl
+streamlit-extras
