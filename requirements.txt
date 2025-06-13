@@ -1,2 +1,10 @@
 streamlit
-openi
+openai
+pandas
+plotly
+numpy
+scikit-learn
+joblib
+matplotlib
+dotenv
+statsmodels

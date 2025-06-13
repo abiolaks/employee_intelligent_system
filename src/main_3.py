@@ -1,7 +1,7 @@
-# app.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from auth import login
 from utils import predict_attrition
 from llm import generate_insights
@@ -13,26 +13,48 @@ st.markdown(
     """
 <style>
     [data-testid="stAppViewContainer"] {
-        background: #f0f2f6;
+        background: #f8f9fa;
     }
     .metric-card {
         background: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 1.5rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin: 10px 0;
+        transition: transform 0.2s;
+    }
+    .metric-card:hover {
+        transform: translateY(-3px);
+    }
+    .metric-value {
+        font-size: 2.2rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin: 0.5rem 0;
+    }
+    .metric-label {
+        font-size: 1rem;
+        color: #7f8c8d;
     }
     .risk-high {
-        color: #ff4b4b;
-        font-weight: bold;
+        color: #e74c3c;
+        font-weight: 700;
     }
     .risk-low {
-        color: #34a853;
-        font-weight: bold;
+        color: #2ecc71;
+        font-weight: 700;
     }
     .stPlotlyChart {
         border-radius: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        background: white;
+        padding: 1rem;
+    }
+    .department-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin: 1rem 0;
     }
 </style>
 """,
@@ -43,12 +65,11 @@ if "logged_in" not in st.session_state:
     login()
     st.stop()
 
-
 # Main tabs
 tabs = st.tabs(["📊 Executive Dashboard", "🧑💼 Employee Insights", "📤 Export Report"])
 
 with tabs[0]:
-    st.subheader("📈 Organizational Health Dashboard")
+    st.subheader("Organizational Health Overview")
 
     uploaded = st.file_uploader(
         "Upload Employee Dataset", type="csv", key="dashboard_upload"
@@ -61,91 +82,114 @@ with tabs[0]:
         at_risk = pred_df[pred_df["Attrition_Probability"] > 0.6]
 
         # Key Metrics
-        col1, col2, col3, col4 = st.columns(4)
+        cols = st.columns(4)
+        metrics = [
+            ("👥 Total Employees", len(pred_df), ""),
+            ("⚠️ At-Risk Employees", len(at_risk), "risk-high"),
+            (
+                "📉 Avg. Risk Score",
+                f"{pred_df['Attrition_Probability'].mean() * 100:.1f}%",
+                "",
+            ),
+            ("🌟 Avg. Engagement", f"{pred_df['engagement_score'].mean():.1f}/5", ""),
+        ]
+
+        for col, (label, value, style) in zip(cols, metrics):
+            with col:
+                st.markdown(
+                    f'<div class="metric-card">'
+                    f'<div class="metric-label">{label}</div>'
+                    f'<div class="metric-value {style}">{value}</div>'
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
+        # Visualization Section
+        st.markdown("---")
+        st.subheader("Risk Analysis")
+
+        col1, col2 = st.columns([2, 1])
         with col1:
-            st.markdown(
-                '<div class="metric-card">📌 Total Employees<br><h2>{}</h2></div>'.format(
-                    len(pred_df)
-                ),
-                unsafe_allow_html=True,
-            )
-        with col2:
-            st.markdown(
-                '<div class="metric-card">⚠️ At-Risk Employees<br><h2 class="risk-high">{}</h2></div>'.format(
-                    len(at_risk)
-                ),
-                unsafe_allow_html=True,
-            )
-        with col3:
-            st.markdown(
-                '<div class="metric-card">📉 Avg. Attrition Risk<br><h2>{:.1f}%</h2></div>'.format(
-                    pred_df["Attrition_Probability"].mean() * 100
-                ),
-                unsafe_allow_html=True,
-            )
-        with col4:
-            st.markdown(
-                '<div class="metric-card">🏆 Avg. Engagement<br><h2>{:.1f}/5</h2></div>'.format(
-                    pred_df["engagement_score"].mean()
-                ),
-                unsafe_allow_html=True,
-            )
-
-        # Visualizations
-        col_left, col_right = st.columns([2, 1])
-        with col_left:
-            # Attrition Probability Distribution
-            fig = px.histogram(
-                pred_df,
-                x="Attrition_Probability",
-                nbins=20,
-                title="Attrition Risk Distribution",
-                color_discrete_sequence=["#ff4b4b"],
-            )
-            fig.update_layout(bargap=0.1)
-            st.plotly_chart(fig, use_container_width=True)
-
-            # Department-wise Analysis
-            dept_df = (
+            # Risk Distribution by Department
+            dept_risk = (
                 pred_df.groupby("department")["Attrition_Probability"]
                 .mean()
                 .reset_index()
             )
             fig = px.bar(
-                dept_df,
+                dept_risk.sort_values("Attrition_Probability", ascending=False),
                 x="department",
                 y="Attrition_Probability",
-                title="Department-wise Attrition Risk",
                 color="Attrition_Probability",
                 color_continuous_scale="RdYlGn_r",
+                title="Departmental Attrition Risk Levels",
             )
             st.plotly_chart(fig, use_container_width=True)
 
-        with col_right:
-            # Risk Segmentation
-            fig = px.pie(
-                pred_df,
-                names="Risk_Label",
-                title="Risk Segmentation",
-                color_discrete_map={"High Risk": "#ff4b4b", "Low Risk": "#34a853"},
+        with col2:
+            # Clear Risk Segmentation
+            risk_counts = pred_df["Risk_Label"].value_counts().reset_index()
+            fig = px.bar(
+                risk_counts,
+                x="count",
+                y="Risk_Label",
+                orientation="h",
+                color="Risk_Label",
+                color_discrete_map={"High Risk": "#e74c3c", "Low Risk": "#2ecc71"},
+                title="Employee Risk Distribution",
+                labels={"count": "Number of Employees", "Risk_Label": "Risk Category"},
             )
+            fig.update_layout(showlegend=False)
             st.plotly_chart(fig, use_container_width=True)
 
-            # Tenure vs Satisfaction
+        st.markdown("---")
+        st.subheader("Key Drivers Analysis")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            # Engagement vs Attrition
             fig = px.scatter(
                 pred_df,
-                x="tenure",
-                y="job_satisfaction",
-                color="Attrition_Probability",
-                title="Tenure vs Job Satisfaction",
-                color_continuous_scale="RdYlGn_r",
+                x="engagement_score",
+                y="Attrition_Probability",
+                color="department",
+                trendline="lowess",
+                title="Engagement Score vs Attrition Risk",
+                labels={"engagement_score": "Engagement Score (1-5)"},
             )
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            # Tenure Impact Analysis
+            tenure_bins = pd.cut(pred_df["tenure"], bins=5)
+            tenure_bins_str = tenure_bins.astype(str)  # Convert intervals to string
+
+            # Now, you can group by the tenure bins (which are strings now)
+            tenure_risk = (
+                pred_df.groupby(tenure_bins_str)["Attrition_Probability"]
+                .mean()
+                .reset_index()
+            )
+
+            fig = px.line(
+                tenure_risk,
+                x="tenure",
+                y="Attrition_Probability",
+                markers=True,
+                title="Tenure Impact on Attrition Risk",
+                labels={
+                    "tenure": "Tenure Range (years)",
+                    "Attrition_Probability": "Avg. Risk Score",
+                },
+            )
+            fig.update_traces(line=dict(color="#e74c3c", width=2.5))
             st.plotly_chart(fig, use_container_width=True)
 
         st.session_state["pred_df"] = pred_df
         st.session_state["at_risk"] = at_risk
 
 with tabs[1]:
+    # Preserved Employee Insights Tab
     st.subheader("🧑💼 Employee Risk Analysis")
     if "pred_df" in st.session_state:
         # Interactive Data Grid
@@ -240,16 +284,12 @@ with tabs[2]:
                 )
 
             st.divider()
-            st.markdown("#### 📈 Key Visualizations")
-            # In the Export Report tab (app.py)
-            st.image(
-                "https://via.placeholder.com/800x400.png?text=Risk+Distribution+Chart",
-                use_container_width=True,
-            )  # Updated parameter
-            st.image(
-                "https://via.placeholder.com/800x400.png?text=Department+Analysis",
-                use_container_width=True,
-            )  # Updated parameter
+            st.markdown("#### 📈 Key Findings")
+            st.markdown(""" 
+            - Detailed analysis of attrition patterns across departments
+            - Correlation between engagement scores and attrition risk
+            - Identification of high-risk employee segments
+            """)
 
         # Export Controls
         st.download_button(
