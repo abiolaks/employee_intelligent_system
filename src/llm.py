@@ -32,6 +32,8 @@ Preventive: ...
         model="deepseek-chat",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
+        max_tokens=300,
+        top_p=1.0,
     )
 
     text = response.choices[0].message.content
