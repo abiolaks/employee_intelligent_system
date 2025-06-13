@@ -1,6 +1,5 @@
 # auth.py
 import streamlit as st
-
 from streamlit_extras.colored_header import colored_header
 from streamlit_extras.stylable_container import stylable_container
 
@@ -8,8 +7,7 @@ from streamlit_extras.stylable_container import stylable_container
 
 
 # 2. Then other imports if needed
-import os
-from typing import Dict
+
 
 # 3. Constants and configurations
 USERS = {
